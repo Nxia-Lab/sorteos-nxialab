@@ -1,0 +1,331 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Segoe UI', sans-serif;
+  --app-bg: #0a0a0a;
+  --panel: rgba(255, 255, 255, 0.04);
+  --panel-muted: rgba(255, 255, 255, 0.03);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --border-soft: rgba(255, 255, 255, 0.1);
+  --accent-strong: #00d9ff;
+  --accent-soft: rgba(0, 217, 255, 0.24);
+  --accent-blue: #0070f3;
+  --accent-blue-soft: rgba(0, 112, 243, 0.24);
+  --grid-opacity: 0.18;
+  --shell-shadow: 0 0 0 1px rgba(0, 217, 255, 0.08), 0 20px 80px rgba(0, 0, 0, 0.35);
+  --card-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+}
+
+html[data-theme='light'] {
+  --app-bg: #eef4fb;
+  --panel: rgba(255, 255, 255, 0.88);
+  --panel-muted: rgba(255, 255, 255, 0.75);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-soft: rgba(15, 23, 42, 0.1);
+  --accent-strong: #007de8;
+  --accent-soft: rgba(0, 125, 232, 0.16);
+  --accent-blue: #0055d4;
+  --accent-blue-soft: rgba(0, 85, 212, 0.16);
+  --grid-opacity: 0.08;
+  --shell-shadow: 0 0 0 1px rgba(15, 23, 42, 0.05), 0 24px 64px rgba(15, 23, 42, 0.12);
+  --card-shadow: 0 10px 30px rgba(148, 163, 184, 0.18);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--accent-blue) 20%, transparent), transparent 40%),
+    radial-gradient(circle at bottom right, color-mix(in srgb, var(--accent-strong) 16%, transparent), transparent 35%),
+    var(--app-bg);
+  color: var(--text-primary);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+a,
+input {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.react-datepicker {
+  display: flex;
+  border: 1px solid var(--border-soft);
+  background: var(--panel);
+  color: var(--text-primary);
+  font-family: 'Segoe UI', sans-serif;
+  overflow: hidden;
+}
+
+.react-datepicker__header {
+  padding: 0;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.react-datepicker__month-container,
+.react-datepicker__time-container,
+.react-datepicker__time,
+.react-datepicker__time-box,
+.react-datepicker__time-list {
+  background: var(--panel);
+}
+
+.react-datepicker__time-container {
+  width: 110px;
+  border-left: 1px solid var(--border-soft);
+}
+
+.react-datepicker__time-container .react-datepicker__time {
+  background: var(--panel);
+}
+
+.react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box {
+  width: 110px;
+}
+
+.react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list {
+  padding: 0;
+}
+
+.react-datepicker__current-month,
+.react-datepicker-time__header,
+.react-datepicker-year-header,
+.react-datepicker__day-name,
+.react-datepicker__day,
+.react-datepicker__time-name,
+.react-datepicker__time-list-item {
+  color: var(--text-primary);
+}
+
+.react-datepicker__day-names {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.75rem 0.75rem 0 0.75rem;
+}
+
+.react-datepicker__week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0 0.75rem;
+}
+
+.react-datepicker__month {
+  margin: 0;
+  padding: 0.5rem 0 0.75rem;
+}
+
+.react-datepicker__day:hover,
+.react-datepicker__time-list-item:hover,
+.react-datepicker__month-text:hover,
+.react-datepicker__quarter-text:hover,
+.react-datepicker__year-text:hover {
+  background: var(--accent-blue-soft);
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected,
+.react-datepicker__time-list-item--selected {
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-strong));
+  color: white;
+}
+
+.react-datepicker__time-list-item {
+  height: auto !important;
+  padding: 10px 8px;
+}
+
+.react-datepicker__time-list-item--disabled {
+  color: var(--text-secondary);
+}
+
+.react-datepicker__triangle {
+  display: none;
+}
+
+.react-datepicker__navigation-icon::before {
+  border-color: var(--accent-strong);
+}
+
+.react-datepicker__input-container input::placeholder {
+  color: var(--text-secondary);
+}
+
+.react-datepicker-popper {
+  z-index: 9999 !important;
+}
+
+.react-datepicker-wrapper {
+  width: 100%;
+}
+
+#root .react-datepicker-popper {
+  position: fixed !important;
+}
+
+.raffle-drum {
+  position: relative;
+  min-width: 280px;
+}
+
+.raffle-drum__halo {
+  position: absolute;
+  inset: 14px;
+  border-radius: 999px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent-strong) 26%, transparent), transparent 70%);
+  filter: blur(18px);
+  opacity: 0.9;
+}
+
+.raffle-ball {
+  position: relative;
+  display: flex;
+  min-height: 112px;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 30% 30%, color-mix(in srgb, white 10%, transparent), transparent 35%),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-blue) 60%, var(--panel)), color-mix(in srgb, var(--accent-strong) 65%, var(--panel)));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 18px 40px rgba(0, 0, 0, 0.22);
+  padding: 1rem 1.5rem;
+  text-align: center;
+  overflow: hidden;
+}
+
+.raffle-ball--rolling {
+  animation: raffle-ball-spin 0.75s ease-in-out infinite;
+}
+
+.raffle-ball__label {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: white;
+}
+
+.raffle-ball__meta {
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.participant-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent-strong) 18%, transparent), transparent 34%),
+    radial-gradient(circle at bottom left, color-mix(in srgb, var(--accent-blue) 14%, transparent), transparent 30%),
+    var(--panel);
+  box-shadow: var(--shell-shadow);
+  padding: 1.5rem;
+}
+
+.participant-hero__glow {
+  position: absolute;
+  inset: -40% auto auto -10%;
+  width: 220px;
+  height: 220px;
+  border-radius: 999px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent-strong) 28%, transparent), transparent 70%);
+  filter: blur(20px);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.participant-hero__content {
+  position: relative;
+  z-index: 1;
+}
+
+.participant-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-muted) 92%, transparent);
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  padding: 0.55rem 0.85rem;
+  text-transform: uppercase;
+}
+
+.participant-chip--blue {
+  color: var(--accent-blue);
+}
+
+.participant-form-shell {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel) 96%, transparent), color-mix(in srgb, var(--panel-muted) 100%, transparent)),
+    var(--panel);
+  box-shadow: var(--shell-shadow);
+  padding: 1.5rem;
+}
+
+.participant-form-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 0%, color-mix(in srgb, var(--accent-strong) 8%, transparent) 48%, transparent 100%);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.participant-form-shell__header {
+  position: relative;
+  z-index: 1;
+}
+
+.participant-form-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes raffle-ball-spin {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  25% {
+    transform: translateY(-4px) scale(1.015) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(3px) scale(0.995) rotate(1deg);
+  }
+  75% {
+    transform: translateY(-2px) scale(1.01) rotate(-0.8deg);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
