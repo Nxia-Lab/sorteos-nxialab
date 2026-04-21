@@ -4,3 +4,4 @@ dist
 .env.local
 vite-lan.log
 vite-lan.err
+.vercel
