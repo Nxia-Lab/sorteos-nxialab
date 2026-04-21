@@ -1,9 +1,12 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { browserLocalPersistence, onAuthStateChanged, setPersistence, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import Card from '../components/Card';
 import LoadingDots from '../components/LoadingDots';
 import Shell from '../components/Shell';
 import { BRANCHES } from '../lib/branches';
 import { formatDate, formatDateRange, getCurrentJornada } from '../lib/format';
+import { auth } from '../lib/firebase';
+import { getAdminEmail, isAllowedAdminEmail } from '../lib/adminAccess';
 import {
   completeRaffle,
   fetchParticipants,
@@ -15,6 +18,7 @@ import {
   updateParticipantRecord,
   updateRaffleStatus,
 } from '../lib/adminData';
+import { subscribeAppConfig, setRegistrationsEnabled } from '../lib/appConfig';
 import { runRaffle } from '../lib/raffle';
 
 const BuilderTab = lazy(() => import('../components/admin/BuilderTab'));
@@ -47,10 +51,6 @@ function clampInteger(value) {
 
 function getSessionKey() {
   return 'raffle-admin-session';
-}
-
-function getAdminPassword() {
-  return import.meta.env.VITE_ADMIN_PASSWORD || 'admin123';
 }
 
 function getEmptyRaffleForm() {
@@ -256,9 +256,12 @@ export default function AdminPage() {
   const [selectedRaffleId, setSelectedRaffleId] = useState(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [activeTab, setActiveTab] = useState('active');
-  const [passwordInput, setPasswordInput] = useState('');
+  const [adminEmailInput, setAdminEmailInput] = useState(getAdminEmail());
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
-  const [isUnlocked, setIsUnlocked] = useState(() => window.localStorage.getItem(getSessionKey()) === 'ok');
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [authenticating, setAuthenticating] = useState(false);
   const [enabledBranches, setEnabledBranches] = useState([]);
   const [manualRegisterBranch, setManualRegisterBranch] = useState('');
   const [raffleForm, setRaffleForm] = useState(getEmptyRaffleForm());
@@ -299,6 +302,49 @@ export default function AdminPage() {
   });
   const [dismissedDrawMessage, setDismissedDrawMessage] = useState(false);
   const [dismissedExpiringReminder, setDismissedExpiringReminder] = useState(false);
+  const [publicAccess, setPublicAccess] = useState({
+    registrationsEnabled: true,
+  });
+  const [publicAccessSaving, setPublicAccessSaving] = useState(false);
+  const [publicAccessError, setPublicAccessError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+
+    setPersistence(auth, browserLocalPersistence).catch(() => {
+      if (active) {
+        setAuthError('No pudimos preparar la sesión persistente del admin.');
+      }
+    });
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!active) {
+        return;
+      }
+
+      const allowed = isAllowedAdminEmail(user?.email);
+      setIsUnlocked(allowed);
+      setAuthReady(true);
+
+      if (!user) {
+        setAuthError('');
+        return;
+      }
+
+      if (!allowed) {
+        setAuthError('Esa cuenta no tiene permiso de administrador.');
+        signOut(auth).catch(() => {});
+        return;
+      }
+
+      setAuthError('');
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const unsubscribeRaffles = subscribeRaffles((items) => {
@@ -310,6 +356,14 @@ export default function AdminPage() {
     });
 
     return unsubscribeRaffles;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribeAppConfig = subscribeAppConfig((config) => {
+      setPublicAccess(config);
+    });
+
+    return unsubscribeAppConfig;
   }, []);
 
   useEffect(() => {
@@ -574,23 +628,52 @@ export default function AdminPage() {
     });
   }, [enabledBranches, raffleForm.endAt, raffleForm.startAt, raffles, selectedRaffle?.id]);
 
-  function handleUnlock(event) {
+  async function handleUnlock(event) {
     event.preventDefault();
 
-    if (passwordInput === getAdminPassword()) {
-      window.localStorage.setItem(getSessionKey(), 'ok');
-      setIsUnlocked(true);
-      setAuthError('');
+    const email = adminEmailInput.trim().toLowerCase();
+
+    if (!isAllowedAdminEmail(email)) {
+      setAuthError(`Usa la cuenta ${getAdminEmail()} para entrar al panel.`);
       return;
     }
 
-    setAuthError('Clave incorrecta. Probá nuevamente.');
+    try {
+      setAuthenticating(true);
+      setAuthError('');
+      await signInWithEmailAndPassword(auth, email, adminPasswordInput);
+    } catch (error) {
+      const code = error?.code;
+      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+        setAuthError('Email o contraseña incorrectos.');
+      } else if (code === 'auth/too-many-requests') {
+        setAuthError('Demasiados intentos. Probá de nuevo en unos minutos.');
+      } else {
+        setAuthError(error?.message || 'No pudimos iniciar sesión.');
+      }
+    } finally {
+      setAuthenticating(false);
+    }
   }
 
-  function handleLogout() {
-    window.localStorage.removeItem(getSessionKey());
+  async function handleLogout() {
+    await signOut(auth);
     setIsUnlocked(false);
-    setPasswordInput('');
+    setAdminPasswordInput('');
+  }
+
+  async function handleTogglePublicAccess() {
+    const nextValue = !publicAccess.registrationsEnabled;
+
+    try {
+      setPublicAccessSaving(true);
+      setPublicAccessError('');
+      await setRegistrationsEnabled(nextValue);
+    } catch (error) {
+      setPublicAccessError(error?.message || 'No pudimos actualizar el estado público.');
+    } finally {
+      setPublicAccessSaving(false);
+    }
   }
 
   function openManualRegister() {
@@ -828,7 +911,7 @@ export default function AdminPage() {
       setDrawState((current) => ({
         ...current,
         running: false,
-        message: 'No se pudo completar el sorteo. Revisá la conexión y la configuración de Firestore.',
+        message: 'No se pudo completar el sorteo. Revisa la conexion y la configuracion de Firestore.',
       }));
     }
   }
@@ -837,7 +920,7 @@ export default function AdminPage() {
     if (!selectedRaffle?.id) {
       setDrawState((current) => ({
         ...current,
-        message: 'ElegÃ­ un sorteo activo antes de ejecutar el sorteo.',
+        message: 'Elegí un sorteo activo antes de ejecutar el sorteo.',
       }));
       return;
     }
@@ -845,7 +928,7 @@ export default function AdminPage() {
     if (selectedRaffle.status !== 'active') {
       setDrawState((current) => ({
         ...current,
-        message: 'Solo podÃ©s sortear campaÃ±as que estÃ©n activas.',
+        message: 'Solo podés sortear campañas que estén activas.',
       }));
       return;
     }
@@ -853,7 +936,7 @@ export default function AdminPage() {
     if (config.winners + config.alternates === 0) {
       setDrawState((current) => ({
         ...current,
-        message: 'DefinÃ­ al menos un ganador o suplente para ejecutar el sorteo.',
+        message: 'Definí al menos un ganador o suplente para ejecutar el sorteo.',
       }));
       return;
     }
@@ -877,7 +960,7 @@ export default function AdminPage() {
           running: false,
           rollingEntry: null,
           rollingLabel: '',
-          message: 'Este sorteo todavÃ­a no tiene participantes cargados.',
+          message: 'Este sorteo todavía no tiene participantes cargados.',
         }));
         return;
       }
@@ -974,7 +1057,7 @@ export default function AdminPage() {
       setDrawState((current) => ({
         ...current,
         running: false,
-        message: 'No se pudo completar el sorteo. RevisÃ¡ la conexiÃ³n y la configuraciÃ³n de Firestore.',
+        message: 'No se pudo completar el sorteo. Revisá la conexión y la configuración de Firestore.',
         rollingEntry: null,
         rollingLabel: '',
       }));
@@ -1172,7 +1255,7 @@ export default function AdminPage() {
     if (selectedRaffle.status !== 'active') {
       setDrawState((current) => ({
         ...current,
-        message: 'Solo podés sortear campañas que estén activas.',
+        message: 'Solo podes sortear campanas que esten activas.',
       }));
       return;
     }
@@ -1198,7 +1281,7 @@ export default function AdminPage() {
         setDrawState((current) => ({
           ...current,
           running: false,
-          message: 'Este sorteo todavía no tiene participantes cargados.',
+          message: 'Este sorteo todavia no tiene participantes cargados.',
         }));
         return;
       }
@@ -1865,33 +1948,53 @@ async function exportDrawReport(result, mode = 'xlsx') {
       <Shell
         eyebrow=""
         title="Acceso al panel administrativo"
-        description="Ingresá con la clave del admin para abrir el tablero de operación de sorteos."
+        description="Ingresa con tu cuenta autorizada para abrir el tablero de operacion de sorteos."
       >
-        <form className="max-w-md space-y-5" onSubmit={handleUnlock}>
-          <label className="space-y-2">
-            <span className="text-sm text-[var(--text-secondary)]">Clave admin</span>
-            <input
-              className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-muted)] px-4 py-3 text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-strong)] focus:ring-2 focus:ring-[var(--accent-soft)]"
-              onChange={(event) => setPasswordInput(event.target.value)}
-              placeholder="Ingresá la clave"
-              type="password"
-              value={passwordInput}
-            />
-          </label>
-
-          <button
-            className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[var(--accent-blue)] to-[var(--accent-strong)] px-6 py-3 text-sm font-semibold text-white transition hover:scale-[1.01]"
-            type="submit"
-          >
-            Ingresar al admin
-          </button>
-
-          {authError ? (
-            <div className="rounded-2xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-500">
-              {authError}
+        {!authReady ? (
+          <Card>
+            <div className="flex min-h-[220px] items-center justify-center">
+              <LoadingDots label="Preparando acceso" />
             </div>
-          ) : null}
-        </form>
+          </Card>
+        ) : (
+          <form className="max-w-md space-y-5" onSubmit={handleUnlock}>
+            <label className="space-y-2">
+              <span className="text-sm text-[var(--text-secondary)]">Email admin</span>
+              <input
+                className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-muted)] px-4 py-3 text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-strong)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+                onChange={(event) => setAdminEmailInput(event.target.value)}
+                placeholder="nxialab@gmail.com"
+                type="email"
+                value={adminEmailInput}
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm text-[var(--text-secondary)]">Contrasena</span>
+              <input
+                className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-muted)] px-4 py-3 text-[var(--text-primary)] outline-none transition focus:border-[var(--accent-strong)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+                onChange={(event) => setAdminPasswordInput(event.target.value)}
+                placeholder="Ingresa la contrasena"
+                type="password"
+                value={adminPasswordInput}
+              />
+            </label>
+
+            <button
+              className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[var(--accent-blue)] to-[var(--accent-strong)] px-6 py-3 text-sm font-semibold text-white transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={authenticating}
+              type="submit"
+            >
+              {authenticating ? "Ingresando..." : "Ingresar al admin"}
+            </button>
+
+            {authError ? (
+              <div className="rounded-2xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-500">
+                {authError}
+              </div>
+            ) : null}
+          </form>
+        )}
       </Shell>
     );
   }
@@ -1928,6 +2031,22 @@ async function exportDrawReport(result, mode = 'xlsx') {
             type="button"
           >
             Abrir registro
+          </button>
+          <button
+            className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5 hover:shadow-[var(--card-shadow)] disabled:cursor-not-allowed disabled:opacity-60 ${
+              publicAccess.registrationsEnabled
+                ? 'border border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
+                : 'border border-rose-400/30 bg-rose-400/10 text-rose-300'
+            }`}
+            disabled={publicAccessSaving}
+            onClick={handleTogglePublicAccess}
+            type="button"
+          >
+            {publicAccessSaving
+              ? 'Actualizando...'
+              : publicAccess.registrationsEnabled
+                ? 'Cerrar inscripciones'
+                : 'Abrir inscripciones'}
           </button>
         </div>
       }

@@ -3,6 +3,7 @@ import LoadingDots from '../components/LoadingDots';
 import Shell from '../components/Shell';
 import { useTheme } from '../context/ThemeContext';
 import { BRANCHES } from '../lib/branches';
+import { subscribeAppConfig } from '../lib/appConfig';
 import { getCurrentJornada, normalizeBranch } from '../lib/format';
 import { createParticipant, subscribeRaffles } from '../lib/publicData';
 
@@ -68,11 +69,22 @@ export default function RegisterPage() {
     message: '',
   });
   const [raffles, setRaffles] = useState([]);
+  const [appConfig, setAppConfig] = useState({
+    registrationsEnabled: true,
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeRaffles((items) => {
       setRaffles(items);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeAppConfig((config) => {
+      setAppConfig(config);
     });
 
     return unsubscribe;
@@ -97,10 +109,12 @@ export default function RegisterPage() {
 
   const matchingRaffles = useMemo(() => getMatchingRaffles(raffles, branch), [raffles, branch]);
   const currentJornada = useMemo(() => getCurrentJornada(new Date(nowTick)), [nowTick]);
+  const registrationsEnabled = appConfig.registrationsEnabled !== false;
   const activeRaffle = matchingRaffles[0] ?? null;
   const hasConflict = matchingRaffles.length > 1;
   const branchExists = BRANCHES.includes(branch);
-  const isReady = Boolean(branch) && Boolean(activeRaffle?.id) && !hasConflict && Boolean(currentJornada);
+  const isReady =
+    Boolean(branch) && Boolean(activeRaffle?.id) && !hasConflict && Boolean(currentJornada) && registrationsEnabled;
   const showStatusModal = status.type !== 'idle' && status.type !== 'loading';
   function updateField(event) {
     const { name, value } = event.target;
@@ -112,6 +126,14 @@ export default function RegisterPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+
+    if (!registrationsEnabled) {
+      setStatus({
+        type: 'error',
+        message: 'El administrador cerró temporalmente las inscripciones. Volvé a intentar más tarde.',
+      });
+      return;
+    }
 
     const payload = {
       nombre: form.nombre.trim(),
@@ -281,6 +303,16 @@ export default function RegisterPage() {
             src="/sorteo-banner.jpeg"
           />
         </div>
+
+        {!registrationsEnabled ? (
+          <div className="rounded-[24px] border border-amber-400/30 bg-amber-400/10 px-5 py-4 text-amber-100 shadow-[var(--card-shadow)]">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-200">Inscripciones cerradas</p>
+            <p className="mt-2 text-sm leading-6 text-amber-50/90">
+              El administrador desactivó temporalmente el acceso público. Cuando vuelva a habilitarse, el formulario se
+              activará otra vez automáticamente.
+            </p>
+          </div>
+        ) : null}
 
         <form className="space-y-5" onSubmit={handleSubmit}>
           <div className="participant-form-shell">

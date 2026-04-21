@@ -1,0 +1,148 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'nxialab@gmail.com';
+    }
+
+    function registrationsEnabled() {
+      return !exists(/databases/$(database)/documents/appConfig/publicAccess)
+        || get(/databases/$(database)/documents/appConfig/publicAccess).data.registrationsEnabled != false;
+    }
+
+    function validRaffleDoc() {
+      return request.resource.data.keys().hasOnly([
+        'name',
+        'startAt',
+        'endAt',
+        'status',
+        'enabledBranches',
+        'drawMode',
+        'winnersPerGroup',
+        'alternatesPerGroup',
+        'createdAt',
+        'updatedAt',
+        'completedAt',
+        'result',
+      ]);
+    }
+
+    function validParticipantCreate() {
+      return request.resource.data.keys().hasOnly([
+        'dni',
+        'nombre',
+        'telefono',
+        'sucursal',
+        'raffleId',
+        'raffleName',
+        'jornadaKey',
+        'jornadaLabel',
+        'jornadaStartAt',
+        'jornadaEndAt',
+        'timestamp',
+      ]) &&
+      request.resource.data.dni is string &&
+      request.resource.data.nombre is string &&
+      request.resource.data.telefono is string &&
+      request.resource.data.sucursal is string &&
+      request.resource.data.raffleId is string &&
+      request.resource.data.raffleName is string &&
+      request.resource.data.jornadaKey is string &&
+      request.resource.data.jornadaLabel is string &&
+      request.resource.data.jornadaStartAt is timestamp &&
+      request.resource.data.jornadaEndAt is timestamp &&
+      request.resource.data.timestamp is timestamp &&
+      exists(/databases/$(database)/documents/sorteos/$(request.resource.data.raffleId)) &&
+      get(/databases/$(database)/documents/sorteos/$(request.resource.data.raffleId)).data.status == 'active' &&
+      request.resource.data.sucursal in get(/databases/$(database)/documents/sorteos/$(request.resource.data.raffleId)).data.enabledBranches &&
+      request.resource.data.raffleName == get(/databases/$(database)/documents/sorteos/$(request.resource.data.raffleId)).data.name;
+    }
+
+    function validCustomerCreate() {
+      return request.resource.data.keys().hasOnly([
+        'dni',
+        'nombre',
+        'telefono',
+        'sucursales',
+        'lastRaffleId',
+        'lastRaffleName',
+        'lastJornadaKey',
+        'lastJornadaLabel',
+        'lastParticipationAt',
+        'totalParticipations',
+        'createdAt',
+        'updatedAt',
+      ]) &&
+      request.resource.data.dni is string &&
+      request.resource.data.nombre is string &&
+      request.resource.data.telefono is string &&
+      request.resource.data.sucursales is list &&
+      request.resource.data.lastRaffleId is string &&
+      request.resource.data.lastRaffleName is string &&
+      request.resource.data.lastJornadaKey is string &&
+      request.resource.data.lastJornadaLabel is string &&
+      request.resource.data.lastParticipationAt is timestamp &&
+      request.resource.data.totalParticipations is int &&
+      request.resource.data.totalParticipations >= 1 &&
+      request.resource.data.createdAt is timestamp &&
+      request.resource.data.updatedAt is timestamp;
+    }
+
+    function validCustomerUpdate() {
+      return request.resource.data.dni == resource.data.dni &&
+      request.resource.data.createdAt == resource.data.createdAt &&
+      request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'nombre',
+        'telefono',
+        'sucursales',
+        'lastRaffleId',
+        'lastRaffleName',
+        'lastJornadaKey',
+        'lastJornadaLabel',
+        'lastParticipationAt',
+        'totalParticipations',
+        'updatedAt',
+      ]) &&
+      request.resource.data.nombre is string &&
+      request.resource.data.telefono is string &&
+      request.resource.data.sucursales is list &&
+      request.resource.data.lastRaffleId is string &&
+      request.resource.data.lastRaffleName is string &&
+      request.resource.data.lastJornadaKey is string &&
+      request.resource.data.lastJornadaLabel is string &&
+      request.resource.data.lastParticipationAt is timestamp &&
+      request.resource.data.totalParticipations is int &&
+      request.resource.data.totalParticipations >= 1 &&
+      request.resource.data.updatedAt is timestamp;
+    }
+
+    match /appConfig/{docId} {
+      allow read: if docId == 'publicAccess';
+      allow write: if isAdmin();
+    }
+
+    match /sorteos/{raffleId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /participantes/{participantId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if registrationsEnabled() && validParticipantCreate();
+    }
+
+    match /clientes/{dni} {
+      allow read, delete: if isAdmin();
+      allow create: if registrationsEnabled() && validCustomerCreate() && request.resource.data.dni == dni;
+      allow update: if registrationsEnabled() && validCustomerUpdate() && request.resource.data.dni == dni;
+    }
+
+    match /jornadaOverrides/{overrideId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

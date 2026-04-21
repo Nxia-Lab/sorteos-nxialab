@@ -20,6 +20,7 @@ const participantsCollection = collection(db, 'participantes');
 const rafflesCollection = collection(db, 'sorteos');
 const customersCollection = collection(db, 'clientes');
 const jornadaOverridesCollection = collection(db, 'jornadaOverrides');
+const appConfigRef = doc(db, 'appConfig', 'publicAccess');
 
 function getJornadaOverrideId({ raffleId, dni, jornadaKey }) {
   return `${raffleId}__${dni}__${jornadaKey}`;
@@ -64,6 +65,16 @@ async function canRegisterAgain({ dni, raffleId, jornadaKey }) {
   };
 }
 
+async function areRegistrationsEnabled() {
+  const snapshot = await getDoc(appConfigRef);
+
+  if (!snapshot.exists()) {
+    return true;
+  }
+
+  return snapshot.data()?.registrationsEnabled !== false;
+}
+
 export async function createParticipant({
   dni,
   nombre,
@@ -76,6 +87,12 @@ export async function createParticipant({
   jornadaStartAt,
   jornadaEndAt,
 }) {
+  const registrationsEnabled = await areRegistrationsEnabled();
+
+  if (!registrationsEnabled) {
+    throw new Error('Las inscripciones están cerradas por el administrador.');
+  }
+
   const access = await canRegisterAgain({ dni, raffleId, jornadaKey });
 
   if (!access.allowed) {

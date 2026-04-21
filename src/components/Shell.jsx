@@ -48,11 +48,11 @@ export default function Shell({
           <section className="relative overflow-hidden rounded-[28px] border border-[var(--border-soft)] bg-[var(--panel)] p-5 shadow-[var(--shell-shadow)] backdrop-blur sm:p-6 xl:p-10">
             <div className="absolute inset-0 -z-10 bg-grid bg-[size:32px_32px] opacity-[var(--grid-opacity)]" />
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--accent-strong)] to-transparent" />
-            {eyebrow ? <p className="text-center text-base font-semibold uppercase tracking-[0.24em] text-[var(--accent-strong)] sm:text-left sm:text-lg">{eyebrow}</p> : null}
-            <h1 className="mx-auto max-w-3xl text-center text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-4xl">
+            {eyebrow ? <p className="text-left text-base font-semibold uppercase tracking-[0.24em] text-[var(--accent-strong)] sm:text-lg">{eyebrow}</p> : null}
+            <h1 className="max-w-3xl text-left text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-4xl">
               {title}
             </h1>
-            {description ? <p className="mx-auto mt-4 max-w-2xl text-center text-sm leading-6 text-[var(--text-secondary)] sm:text-base">{description}</p> : null}
+            {description ? <p className="mt-4 max-w-2xl text-left text-sm leading-6 text-[var(--text-secondary)] sm:text-base">{description}</p> : null}
             <div className="mt-6 sm:mt-8">{children}</div>
           </section>
 
